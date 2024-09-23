@@ -7,6 +7,8 @@
 void OPGGRequest::Init(std::string client_version)
 {
 	client_version_ = client_version;
+
+	spdlog::info(__FUNCTION__ " version:{}", client_version_);
 }
 
 std::map<int, OPGGChampRankInfo> OPGGRequest::GetOPGGChampRankInfo()
@@ -14,6 +16,8 @@ std::map<int, OPGGChampRankInfo> OPGGRequest::GetOPGGChampRankInfo()
 	session_.SetUrl(nbase::StringPrintf("https://lol-api-champion.op.gg/api/%s/champions/%s?tier=all&version=%s", 
 		"kr", "aram", client_version_.c_str()));
 	std::string procSession = session_.Get().text;
+
+	spdlog::info(__FUNCTION__ " result:{}", procSession);
 
 	Json::CharReaderBuilder builder;
 	const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());

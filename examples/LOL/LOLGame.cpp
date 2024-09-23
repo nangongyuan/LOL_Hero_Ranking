@@ -13,14 +13,14 @@
 typedef LONG NTSTATUS;
 
 
-Game::Game(MainWindow* main_window)
+LOLGame::LOLGame(MainWindow* main_window)
 :FrameworkThread("GameThread")
 {
 	thread_id_ = kThreadGame;
 	main_window_ = main_window;
 }
 
-void Game::SetChampionConf()
+void LOLGame::SetChampionConf()
 {
 	if (cur_select_champ_info_.id == 0)
 		return;
@@ -34,28 +34,28 @@ void Game::SetChampionConf()
 	spdlog::info(__FUNCTION__ " champ_info: id:{} name:{}", cur_select_champ_info_.id, cur_champ_conf_.champ_name);
 }
 
-void Game::Init()
+void LOLGame::Init()
 {
 	nbase::ThreadManager::RegisterThread(thread_id_);
 
 	nbase::ThreadManager::PostRepeatedTask(kThreadGame,
-		nbase::Bind(&Game::OnTimer, this), nbase::TimeDelta::FromMilliseconds(300), nbase::ThreadManager::TIMES_FOREVER);
+		nbase::Bind(&LOLGame::OnTimer, this), nbase::TimeDelta::FromMilliseconds(300), nbase::ThreadManager::TIMES_FOREVER);
 
 	SetGameLog("初始化完成，等待游戏启动");
 }
 
 
-void Game::Cleanup()
+void LOLGame::Cleanup()
 {
 	nbase::ThreadManager::UnregisterThread();
 }
 
-LCURequest& Game::GetLCURequest()
+LCURequest& LOLGame::GetLCURequest()
 {
 	return lcu_request_;
 }
 
-void Game::Test()
+void LOLGame::Test()
 {
 	opgg_request_.Init(client_info_.version);
 	all_champ_rank_info_ = opgg_request_.GetOPGGChampRankInfo();
@@ -78,7 +78,7 @@ void Game::Test()
 	}
 }
 
-void Game::OnTimer()
+void LOLGame::OnTimer()
 {
 	switch (cur_game_status_)
 	{
@@ -123,7 +123,7 @@ void Game::OnTimer()
 	}
 }
 
-void Game::FindGameWindow()
+void LOLGame::FindGameWindow()
 {
 	HWND hwnd = ::FindWindow(L"RCLIENT", L"League of Legends");
 	if (hwnd)
@@ -132,7 +132,7 @@ void Game::FindGameWindow()
 	}
 }
 
-void Game::OnGameNone()
+void LOLGame::OnGameNone()
 {
 	if (!available_champ_info_map_.empty())
 	{
@@ -150,15 +150,19 @@ void Game::OnGameNone()
 	SetGameStatus(game_status, status);
 }
 
-void Game::OnClientInfo()
+void LOLGame::OnClientInfo()
 {
 	DWORD pid = nbase::win32::GetProcessIDByName(Process_Name);
 	spdlog::info(__FUNCTION__ " pid:{}", pid);
 	if (pid == 0)
 		return;
 
-	if (cur_summoner_info_.summonerId != 0)
+	if (cur_summoner_info_.summonerId != 0 && !all_champ_info_map_.empty()
+		&& !all_champ_rank_info_.empty())
+	{
+		SetGameStatus(GameStatus::None, "大厅等待中");
 		return;
+	}
 
 	client_info_ = GetClientInfo(pid);
 
@@ -172,12 +176,10 @@ void Game::OnClientInfo()
 	nbase::ThreadManager::PostTask(kThreadUI,
 		nbase::Bind(&MainWindow::SetSummonerInfo, main_window_, cur_summoner_info_));
 
-	SetGameStatus(GameStatus::None, "大厅等待中");
-
 	GetAllChampInfo();
 }
 
-void Game::OnChampSelect()
+void LOLGame::OnChampSelect()
 {
 	std::string status;
 	GameStatus game_status = lcu_request_.GetGameStatus(status);
@@ -234,7 +236,7 @@ void Game::OnChampSelect()
 	}
 }
 
-void Game::OnGameInProgress()
+void LOLGame::OnGameInProgress()
 {
 	static int count = 0;
 	count++;
@@ -247,7 +249,7 @@ void Game::OnGameInProgress()
 	}
 }
 
-void Game::OnMyChampChanged(int id)
+void LOLGame::OnMyChampChanged(int id)
 {
 	ChampInfo champ_info = GetChampInfoById(id);
 	SetGameLog(std::string("选中英雄：") + champ_info.name);
@@ -258,32 +260,37 @@ void Game::OnMyChampChanged(int id)
 		nbase::Bind(&MainWindow::SetChampInfo, main_window_, champ_info));
 }
 
-void Game::SetGameLog(const std::string& log)
+void LOLGame::SetGameLog(const std::string& log)
 {
 	nbase::ThreadManager::PostTask(kThreadUI,
 		nbase::Bind(&MainWindow::SetGameLog, main_window_, log));
 }
 
-void Game::SetGameStatus(GameStatus game_status, std::string status)
+void LOLGame::SetGameStatus(GameStatus game_status, std::string status)
 {
 	if (cur_game_status_ == game_status)
 		return;
 
 	cur_game_status_ = game_status;
 	SetGameLog(std::string("游戏状态变化：") + status);
+	spdlog::info(__FUNCTION__ " status:{}", status);
 }
 
-ChampInfo Game::GetChampInfoById(int id)
+ChampInfo LOLGame::GetChampInfoById(int id)
 {
 	return all_champ_info_map_[id];
 }
 
-void Game::GetAllChampInfo()
+void LOLGame::GetAllChampInfo()
 {
+	spdlog::info(__FUNCTION__);
+
 	if (all_champ_info_map_.empty())
 	{
 		all_champ_info_map_ = lcu_request_.GetAllChampInfoMap();
 	}
+
+	if (all_champ_info_map_.empty()) return;
 
 	if (all_champ_rank_info_.empty())
 	{
@@ -302,7 +309,7 @@ void Game::GetAllChampInfo()
 	
 }
 
-std::wstring Game::GetProcessCommandLine(const DWORD& processId)
+std::wstring LOLGame::GetProcessCommandLine(const DWORD& processId)
 {
 	using tNtQueryInformationProcess = NTSTATUS(__stdcall*)
 		(
@@ -476,7 +483,7 @@ std::wstring Game::GetProcessCommandLine(const DWORD& processId)
 	return result;
 }
 
-ClientInfo Game::GetClientInfo(const DWORD& pid, bool riotClient)
+ClientInfo LOLGame::GetClientInfo(const DWORD& pid, bool riotClient)
 {
 	if (!pid)
 		return {};
@@ -494,7 +501,7 @@ ClientInfo Game::GetClientInfo(const DWORD& pid, bool riotClient)
 	return info;
 }
 
-int Game::GetPort(const std::string& cmdLine, bool riotClient)
+int LOLGame::GetPort(const std::string& cmdLine, bool riotClient)
 {
 	std::regex regexStr;
 	regexStr = riotClient ? "--riotclient-app-port=(\\d*)" : "--app-port=(\\d*)";
@@ -505,7 +512,7 @@ int Game::GetPort(const std::string& cmdLine, bool riotClient)
 	return 0;
 }
 
-std::string Game::GetToken(const std::string& cmdLine, bool riotClient)
+std::string LOLGame::GetToken(const std::string& cmdLine, bool riotClient)
 {
 	std::regex regexStr;
 	regexStr = riotClient ? "--riotclient-auth-token=([\\w-]*)" : "--remoting-auth-token=([\\w-]*)";
@@ -522,7 +529,7 @@ std::string Game::GetToken(const std::string& cmdLine, bool riotClient)
 	return "";
 }
 
-std::wstring Game::GetProcessPath(const DWORD& processId)
+std::wstring LOLGame::GetProcessPath(const DWORD& processId)
 {
 	static HMODULE kernel32 = GetModuleHandleA("kernel32");
 	static auto pOpenProcess = (decltype(&OpenProcess))GetProcAddress(kernel32, "OpenProcess");
@@ -542,7 +549,7 @@ std::wstring Game::GetProcessPath(const DWORD& processId)
 	return L"";
 }
 
-std::string Game::GetFileVersion(const std::wstring& file)
+std::string LOLGame::GetFileVersion(const std::wstring& file)
 {
 	if (const DWORD versionSize = GetFileVersionInfoSizeW(file.c_str(), nullptr))
 	{

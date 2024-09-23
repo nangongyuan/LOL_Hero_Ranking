@@ -7,7 +7,7 @@ const std::wstring MainWindow::kClassName = L"MainWindow";
 
 MainWindow::MainWindow()
 {
-  game_ = std::make_unique<Game>(this);
+  game_ = std::make_unique<LOLGame>(this);
 }
 
 
@@ -24,6 +24,8 @@ void MainWindow::SetSummonerInfo(const SummonerInfo summoner_info)
 
 void MainWindow::SetChampInfo(const ChampInfo champ_info)
 {
+  if (champ_info.name.empty()) return;
+
   control_champ_image_->SetBkImage(nbase::win32::GetCurrentModuleDirectory() + L"image\\" + nbase::StringPrintf(L"%d.png", champ_info.id));
   label_champ_name_->SetUTF8Text(champ_info.name);
   label_champ_title_->SetUTF8Text(champ_info.title);
@@ -234,7 +236,7 @@ bool MainWindow::OnClickTest(ui::EventArgs* arg)
 bool MainWindow::OnClickConfigChamp(ui::EventArgs* arg)
 {
   nbase::ThreadManager::PostTask(kThreadGame,
-    nbase::Bind(&Game::SetChampionConf, game_.get()));
+    nbase::Bind(&LOLGame::SetChampionConf, game_.get()));
   return false;
 }
 

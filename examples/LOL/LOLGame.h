@@ -6,10 +6,10 @@
 
 class MainWindow;
 
-class Game : public nbase::FrameworkThread
+class LOLGame : public nbase::FrameworkThread
 {
 public:
-	Game(MainWindow* main_window);
+	LOLGame(MainWindow* main_window);
 
 	void SetChampionConf();
 

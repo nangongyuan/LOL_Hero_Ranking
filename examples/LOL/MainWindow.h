@@ -62,6 +62,6 @@ private:
 
 	ui::RichEdit* edit_body_ = nullptr;
 
-	std::unique_ptr<Game> game_;
+	std::unique_ptr<LOLGame> game_;
 };
 
